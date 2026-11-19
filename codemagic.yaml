@@ -12,18 +12,11 @@ workflows:
         script: flutter create --platforms=ios --org com.aistudio.sakwinch --project-name anqizni_ios .
       - name: Get Flutter packages
         script: flutter pub get
-      - name: Setup Temporary Signing
+      - name: Build iOS Bundle
+        script: flutter build ios --simulator --release
+      - name: Package iOS App
         script: |
-          keychain initialize
-          openssl req -x509 -newkey rsa:2048 -keyout key.pem -out cert.pem -days 365 -nodes -subj "/CN=Apple Development: Anqizni Dev/OU=DEV/O=SAK/C=EG"
-          openssl pkcs12 -export -out cert.p12 -inkey key.pem -in cert.pem -passout pass:1234
-          keychain add-certificates --certificate cert.p12 --certificate-password 1234
-      - name: Build iOS App
-        script: flutter build ios --release --no-codesign
-      - name: Package IPA
-        script: |
-          mkdir -p Payload
-          cp -r build/ios/iphoneos/Runner.app Payload/
-          zip -r Anqizni-iOS-Unsigned.ipa Payload
+          cd build/ios/iphonesimulator
+          zip -r ../../../Anqizni-iOS-App.zip Runner.app
     artifacts:
-      - Anqizni-iOS-Unsigned.ipa
+      - Anqizni-iOS-App.zip
