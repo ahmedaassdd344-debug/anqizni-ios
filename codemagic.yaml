@@ -12,13 +12,12 @@ workflows:
         script: flutter create --platforms=ios --org com.aistudio.sakwinch --project-name anqizni_ios .
       - name: Get Flutter packages
         script: flutter pub get
-      - name: Disable Code Signing in Xcode Project
-        script: |
-          sed -i '' 's/CODE_SIGN_STYLE = Automatic;/CODE_SIGN_STYLE = Manual;/g' ios/Runner.xcodeproj/project.pbxproj
-          sed -i '' 's/DEVELOPMENT_TEAM = "";//g' ios/Runner.xcodeproj/project.pbxproj
-          /usr/libexec/PlistBuddy -c "Add :CODE_SIGNING_ALLOWED string NO" ios/Runner/Info.plist || true
+      - name: Configure Flutter iOS
+        script: flutter build ios --config-only --release --no-codesign
       - name: Build iOS App (Unsigned)
-        script: flutter build ios --release --no-codesign
+        script: |
+          cd ios
+          xcodebuild -workspace Runner.xcworkspace -scheme Runner -configuration Release -sdk iphoneos CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO CONFIGURATION_BUILD_DIR="$CM_BUILD_DIR/build/ios/iphoneos" build
       - name: Package IPA
         script: |
           mkdir -p Payload
