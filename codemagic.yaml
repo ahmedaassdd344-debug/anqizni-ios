@@ -13,7 +13,7 @@ workflows:
       - name: Get Flutter packages
         script: flutter pub get
       - name: Build iOS Bundle
-        script: flutter build ios --simulator --release
+        script: flutter build ios --simulator --debug
       - name: Package iOS App
         script: |
           cd build/ios/iphonesimulator
