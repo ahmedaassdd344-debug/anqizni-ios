@@ -26,7 +26,6 @@ void main() async {
 const Color kRoyalCrimson = Color(0xFFB91C1C);
 const Color kObsidianHeader = Color(0xFF0F172A);
 const Color kEmeraldOnline = Color(0xFF059669);
-const Color kSurfaceMuted = Color(0xFFF1F5F9);
 
 class EgyptianZone {
   final String nameAr;
@@ -266,11 +265,224 @@ class _CustomerIosScreenState extends State<CustomerIosScreen> {
     final pin = (1000 + Random().nextInt(9000)).toString();
     final newRef = _tripsRef.push();
     final id = newRef.key ?? 'SAK-${DateTime.now().millisecondsSinceEpoch}';
-
-    await newRef.set({
+        await newRef.set({
       'id': id,
       'customerName': widget.customerName,
       'customerPhone': widget.customerPhone,
       'pickupZone': _pickupName,
       'pickupLat': _pickupPos.latitude,
       'pickupLng': _pickupPos.longitude,
+      'dropoffZone': _dropoffName,
+      'dropoffLat': _dropoffPos.latitude,
+      'dropoffLng': _dropoffPos.longitude,
+      'distanceKm': dist,
+      'vehicleCategory': _selectedVehicle,
+      'serviceLine': _selectedService,
+      'paymentMethod': _selectedPayment,
+      'lockedPriceEgp': price,
+      'pin': pin,
+      'status': 'SEARCHING',
+      'createdAt': DateTime.now().millisecondsSinceEpoch,
+    });
+
+    setState(() => _activeTripId = id);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_activeTripId != null) {
+      return StreamBuilder<DatabaseEvent>(
+        stream: _tripsRef.child(_activeTripId!).onValue,
+        builder: (context, snapshot) {
+          final data = snapshot.data?.snapshot.value as Map<dynamic, dynamic>?;
+          if (data == null) return const Center(child: CircularProgressIndicator());
+          return Padding(
+            padding: const EdgeInsets.all(16),
+            child: Card(
+              color: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text('حالة الطلب: ${data['status']}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: kEmeraldOnline)),
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(color: kObsidianHeader, borderRadius: BorderRadius.circular(14)),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text('كود الأمان (PIN):', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                          Text('${data['pin']}', style: const TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.bold)),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Text('المسار: ${data['pickupZone']} ⬅ ${data['dropoffZone']}'),
+                    Text('التكلفة: ${data['lockedPriceEgp']} ج.م (${data['paymentMethod']})', style: const TextStyle(fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 16),
+                    OutlinedButton(
+                      onPressed: () async {
+                        await _tripsRef.child(_activeTripId!).remove();
+                        setState(() => _activeTripId = null);
+                      },
+                      child: const Text('إلغاء الطلب / طلب جديد'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      );
+    }
+
+    final dist = calculateRoadDistanceKm(_pickupPos.latitude, _pickupPos.longitude, _dropoffPos.latitude, _dropoffPos.longitude);
+    final lockedPrice = _calculateLockedPrice();
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Card(
+            color: Colors.white,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            child: Padding(
+              padding: const EdgeInsets.all(14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('خريطة التغطية المباشرة', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ChoiceChip(
+                          label: Text('استلام: $_pickupName', overflow: TextOverflow.ellipsis),
+                          selected: _targetMode == 'pickup',
+                          onSelected: (_) => setState(() => _targetMode = 'pickup'),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: ChoiceChip(
+                          label: Text('تسليم: $_dropoffName', overflow: TextOverflow.ellipsis),
+                          selected: _targetMode == 'dropoff',
+                          onSelected: (_) => setState(() => _targetMode = 'dropoff'),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    height: 38,
+                    child: ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: kEgyptianZones.length,
+                      separatorBuilder: (_, __) => const SizedBox(width: 6),
+                      itemBuilder: (context, i) {
+                        final z = kEgyptianZones[i];
+                        return ActionChip(
+                          label: Text(z.nameAr),
+                          onPressed: () {
+                            setState(() {
+                              if (_targetMode == 'pickup') {
+                                _pickupName = z.nameAr;
+                                _pickupPos = LatLng(z.lat, z.lng);
+                                _targetMode = 'dropoff';
+                              } else {
+                                _dropoffName = z.nameAr;
+                                _dropoffPos = LatLng(z.lat, z.lng);
+                              }
+                            });
+                            _mapController.move(LatLng(z.lat, z.lng), 12.5);
+                          },
+                        );
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(14),
+                    child: SizedBox(
+                      height: 240,
+                      child: FlutterMap(
+                        mapController: _mapController,
+                        options: MapOptions(
+                          initialCenter: _pickupPos,
+                          initialZoom: 12.0,
+                          onTap: (_, point) {
+                            setState(() {
+                              if (_targetMode == 'pickup') {
+                                _pickupName = 'موقع محدد على الخريطة';
+                                _pickupPos = point;
+                              } else {
+                                _dropoffName = 'وجهة محددة على الخريطة';
+                                _dropoffPos = point;
+                              }
+                            });
+                          },
+                        ),
+                        children: [
+                          TileLayer(
+                            urlTemplate: 'https://openstreetmap.org{z}/{x}/{y}.png',
+                            userAgentPackageName: 'com.aistudio.sakwinch.krmzqt',
+                          ),
+                          PolylineLayer(
+                            polylines: [
+                              Polyline(points: [_pickupPos, _dropoffPos], color: kRoyalCrimson, strokeWidth: 4),
+                            ],
+                          ),
+                          MarkerLayer(
+                            markers: [
+                              Marker(point: _pickupPos, child: const Icon(Icons.location_on, color: kEmeraldOnline, size: 36)),
+                              Marker(point: _dropoffPos, child: const Icon(Icons.flag, color: kRoyalCrimson, size: 36)),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text('المسافة المحسوبة: $dist كم', style: const TextStyle(fontWeight: FontWeight.bold)),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Card(
+            color: Colors.white,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            child: Padding(
+              padding: const EdgeInsets.all(14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('اختر فئة السيارة وخط الخدمة', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    children: [
+                      ChoiceChip(
+                        label: const Text('سيدان / عادية'),
+                        selected: _selectedVehicle == 'سيدان / عادية',
+                        onSelected: (_) => setState(() {
+                          _selectedVehicle = 'سيدان / عادية';
+                          _vehicleMult = 1.0;
+                        }),
+                      ),
+                      ChoiceChip(
+                        label: const Text('دفع رباعي SUV'),
+                        selected: _selectedVehicle == 'دفع رباعي SUV',
+                        onSelected: (_) => setState(() {
+                          _selectedVehicle = 'دفع رباعي SUV';
+                          _vehicleMult = 1.25;
+                        }),
+                      ),
+                      ChoiceChip(
+                        label: const Text('رياضية منخفضة VIP'),
+                        selected: _selectedVehicle == 'رياضية منخفضة VIP',
+  
