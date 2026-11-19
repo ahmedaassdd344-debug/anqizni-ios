@@ -482,7 +482,181 @@ class _CustomerIosScreenState extends State<CustomerIosScreen> {
                           _vehicleMult = 1.25;
                         }),
                       ),
-                      ChoiceChip(
+                                            ChoiceChip(
                         label: const Text('رياضية منخفضة VIP'),
                         selected: _selectedVehicle == 'رياضية منخفضة VIP',
-  
+                        onSelected: (_) => setState(() {
+                          _selectedVehicle = 'رياضية منخفضة VIP';
+                          _vehicleMult = 1.5;
+                        }),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    children: [
+                      ChoiceChip(
+                        label: const Text('إنقاذ فوري'),
+                        selected: _selectedService == 'إنقاذ فوري',
+                        onSelected: (_) => setState(() {
+                          _selectedService = 'إنقاذ فوري';
+                          _serviceMult = 1.0;
+                        }),
+                      ),
+                      ChoiceChip(
+                        label: const Text('حجز مسبق (-10%)'),
+                        selected: _selectedService == 'حجز مسبق',
+                        onSelected: (_) => setState(() {
+                          _selectedService = 'حجز مسبق';
+                          _serviceMult = 0.9;
+                        }),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Card(
+            color: Colors.white,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            child: Padding(
+              padding: const EdgeInsets.all(14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('اختر وسيلة الدفع', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    height: 40,
+                    child: ListView(
+                      scrollDirection: Axis.horizontal,
+                      children: ['كاش عند التسليم', 'إنستا باي', 'فودافون كاش', 'بطاقة بنكية (فيزا)'].map((method) {
+                        return Padding(
+                          padding: const EdgeInsets.only(left: 8),
+                          child: ChoiceChip(
+                            label: Text(method),
+                            selected: _selectedPayment == method,
+                            onSelected: (_) => setState(() => _selectedPayment = method),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 14),
+          Card(
+            color: kObsidianHeader,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            child: Padding(
+              padding: const EdgeInsets.all(18),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('السعر المقفول النهائي', style: TextStyle(color: Colors.white70)),
+                          Text('$_selectedVehicle • $_selectedPayment', style: const TextStyle(color: Colors.white54, fontSize: 12)),
+                        ],
+                      ),
+                      Text('$lockedPrice ج.م', style: const TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: kRoyalCrimson,
+                      foregroundColor: Colors.white,
+                      minimumSize: const Size.fromHeight(54),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    ),
+                    icon: const Icon(Icons.local_shipping),
+                    label: const Text('تأكيد طلب الإنقاذ الآن', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                    onPressed: _submitOrder,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class CaptainIosScreen extends StatelessWidget {
+  const CaptainIosScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final tripsRef = FirebaseDatabase.instance.ref('trips');
+    return StreamBuilder<DatabaseEvent>(
+      stream: tripsRef.onValue,
+      builder: (context, snapshot) {
+        final raw = snapshot.data?.snapshot.value as Map<dynamic, dynamic>?;
+        if (raw == null) return const Center(child: Text('لا توجد طلبات حالياً'));
+        final trips = raw.entries.map((e) => Map<String, dynamic>.from(e.value as Map)).toList();
+        return ListView.builder(
+          padding: const EdgeInsets.all(16),
+          itemCount: trips.length,
+          itemBuilder: (context, i) {
+            final t = trips[i];
+            return Card(
+              color: Colors.white,
+              margin: const EdgeInsets.only(bottom: 12),
+              child: ListTile(
+                title: Text('${t['pickupZone']} ⬅ ${t['dropoffZone']}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                subtitle: Text('السعر: ${t['lockedPriceEgp']} ج.م • الحالة: ${t['status']}'),
+                trailing: ElevatedButton(
+                  style: ElevatedButton.styleFrom(backgroundColor: kEmeraldOnline, foregroundColor: Colors.white),
+                  onPressed: () => tripsRef.child(t['id']).update({'status': 'ACCEPTED', 'captainName': 'كابتن SAK'}),
+                  child: const Text('قبول'),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+}
+
+class AdminIosScreen extends StatelessWidget {
+  const AdminIosScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final tripsRef = FirebaseDatabase.instance.ref('trips');
+    return StreamBuilder<DatabaseEvent>(
+      stream: tripsRef.onValue,
+      builder: (context, snapshot) {
+        final raw = snapshot.data?.snapshot.value as Map<dynamic, dynamic>?;
+        final count = raw?.length ?? 0;
+        return Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Card(
+                color: kObsidianHeader,
+                child: Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Text('إجمالي الرحلات المسجلة في السحابة: $count', style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
