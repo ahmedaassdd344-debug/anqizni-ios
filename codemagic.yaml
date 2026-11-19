@@ -12,19 +12,18 @@ workflows:
         script: flutter create --platforms=ios --org com.aistudio.sakwinch --project-name anqizni_ios .
       - name: Get Flutter packages
         script: flutter pub get
-      - name: Build iOS App (Unsigned)
+      - name: Setup Temporary Signing
         script: |
-          flutter build ios --config-only --release --no-codesign
-          cd ios
-          export FLUTTER_BUILD_MODE=release
-          export FLUTTER_ROOT=$(dirname $(dirname $(which flutter)))
-          export FLUTTER_APPLICATION_PATH=$CM_BUILD_DIR
-          export FLUTTER_TARGET=lib/main.dart
-          xcodebuild -workspace Runner.xcworkspace -scheme Runner -configuration Release -sdk iphoneos CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO build
+          keychain initialize
+          openssl req -x509 -newkey rsa:2048 -keyout key.pem -out cert.pem -days 365 -nodes -subj "/CN=Apple Development: Anqizni Dev/OU=DEV/O=SAK/C=EG"
+          openssl pkcs12 -export -out cert.p12 -inkey key.pem -in cert.pem -passout pass:1234
+          keychain add-certificates --certificate cert.p12 --certificate-password 1234
+      - name: Build iOS App
+        script: flutter build ios --release --no-codesign
       - name: Package IPA
         script: |
           mkdir -p Payload
-          cp -r build/ios/Release-iphoneos/Runner.app Payload/
+          cp -r build/ios/iphoneos/Runner.app Payload/
           zip -r Anqizni-iOS-Unsigned.ipa Payload
     artifacts:
       - Anqizni-iOS-Unsigned.ipa
